@@ -1,23 +1,7 @@
 <?php
 include 'dbconnect.php';
-$dbConn = OpenCon();
 
-# function indexDir($dir)
-# {
-#     $dirs = scandir($dir);
-#     foreach ($dirs as $file) {
-#         if (is_dir($file)) {
-#             indexDir($file);
-#         } else {
-#             $sql = "INSERT INTO files_tmp (Name,Path) VALUES ('" . basename($file) . "','" . realpath($file) . "')<br/>";
-#         }
-#         echo (var_dump($file) . "<br/>");
-#     }
-# }
-$arr = array();
-$start_sql = "INSERT INTO files_tmp (Name,Path) VALUES ";
-
-function indexDir($path = '.', $level = 0, $dbConn, $arr, $start_sql)
+function indexDir($path = '.', $level = 0, $dbConn, $arr, $start_sql, $fp)
 {
     $ignore = array('.', '..', '$RECYCLE.BIN');
     // Directories to ignore when listing output. Many hosts 
@@ -38,13 +22,14 @@ function indexDir($path = '.', $level = 0, $dbConn, $arr, $start_sql)
 
             if (is_dir("$path/$file")) {
                 // Its a directory, so we need to keep reading down... 
-                indexDir("$path\\$file", ($level + 1), $dbConn, $arr, $start_sql);
+                indexDir("$path\\$file", ($level + 1), $dbConn, $arr, $start_sql, $fp++);
                 // Re-call this same function but on a new directory. 
                 // this is what makes function recursive. 
 
             } else {
                 $sql = "('" . $file . "','" . str_replace("\\", "\\\\", $path) . "\\\\" . $file . "')";
                 $arr = bulkSQL($arr, 128, $start_sql, $sql, $dbConn);
+                $fp++;
             }
         }
     }
@@ -63,19 +48,27 @@ function toString($arr)
 function bulkSQL($arr, $max_arr, $start_sql, $sql, $dbConn)
 {
     if (count($arr) == $max_arr) {
-        $query = $start_sql . toString($arr) . $sql . ";";
+        $query = toString($arr) . $sql . ";";
         mysqli_query($dbConn, $query);
-        return array();
+        return [$start_sql];
     } else {
-        return array_push($arr, $sql . ",");
+        array_push($arr, $sql . ",");
+        return $arr;
     }
 }
-function SQLFlush($arr, $start_sql, $dbConn)
+function SQLFlush($arr, $dbConn)
 {
-    $query = $start_sql . toString($arr) . ";";
+    $query = toString($arr) . ";";
     mysqli_query($dbConn, $query);
 }
+
+$files_processed = 0;
+$dbConn = OpenCon();
+$start_sql = "INSERT INTO files_tmp (Name,Path) VALUES ";
+$arr = [$start_sql];
+var_dump($arr);
+indexDir("D:\\loic\\Pokered", 0, $dbConn, $arr, $start_sql, $files_processed);
 echo "done";
-indexDir("D:\\loic\\Pokered", 0, $dbConn, $arr, $start_sql);
-SQLFlush($arr, $start_sql, $dbConn);
+var_dump($files_processed);
+SQLFlush($arr, $dbConn);
 closeCon($dbConn);
