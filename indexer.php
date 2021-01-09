@@ -10,9 +10,14 @@ $start_time = microtime(true);
 
 function indexDir($path = '.')
 {
-    global $arr, $fp;
+    global $arr, $fp, $dbConn;
     $ignore = array('.', '..', '$RECYCLE.BIN'); // Filenames to be ignored
     $dh = @opendir($path); // Directory handle
+    if ($dh instanceof bool) {
+        SQLFlush($arr);
+        closeCon($dbConn);
+        die($path);
+    }
     while (false !== ($file = readdir($dh))) {
         if (!in_array($file, $ignore)) {
             if (is_dir("$path/$file")) {
